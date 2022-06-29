@@ -2,13 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:upi_india/upi_india.dart';
 
 import 'package:flutter_enhanced_barcode_scanner/flutter_enhanced_barcode_scanner.dart';
+import 'main.dart';
 
 class NewTxn extends StatefulWidget {
+  const NewTxn({Key? key}) : super(key: key);
+
   @override
-  _NewTxnState createState() => _NewTxnState();
+  NewTxnState createState() => NewTxnState();
+
+  void comeHere(context) {
+    Navigator.of(context).pushReplacementNamed(
+      'index',
+    );
+  }
 }
 
-class _NewTxnState extends State<NewTxn> {
+class NewTxnState extends State<NewTxn> {
   Future<UpiResponse>? _transaction;
   final UpiIndia _upiIndia = UpiIndia();
   List<UpiApp>? apps;
@@ -284,8 +293,11 @@ class _NewTxnState extends State<NewTxn> {
             }
           });
         },
+        keyboardType: fieldNum == 4 ? TextInputType.number : TextInputType.text,
         decoration: InputDecoration(
-          border: const OutlineInputBorder(),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           labelText: label,
           hintText: hint,
           prefixIcon: descIcon,
@@ -311,10 +323,8 @@ class _NewTxnState extends State<NewTxn> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        centerTitle: true,
-        title: const Text('UniUPI'),
-      ),
+      drawer: myDrawer(context),
+      appBar: myAppBar(),
       body: Column(
         children: [
           // textField(
