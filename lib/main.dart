@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:upi_india/upi_india.dart';
 
+import 'package:flutter_enhanced_barcode_scanner/flutter_enhanced_barcode_scanner.dart';
+
 void main() => runApp(MyApp());
 
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'Test UPI',
       home: HomePage(),
     );
@@ -20,13 +23,13 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   Future<UpiResponse>? _transaction;
-  UpiIndia _upiIndia = UpiIndia();
+  final UpiIndia _upiIndia = UpiIndia();
   List<UpiApp>? apps;
 
-  double amt = 0.0;
-  String upiID = "9839916407@paytm";
-  String message = 'Not actual. Just an example.';
-  String nm = "Mudit Garg";
+  late double amt;
+  late String upiID;
+  late String message;
+  late String nm;
 
   TextEditingController nmController = TextEditingController();
   TextEditingController amtController = TextEditingController();
@@ -36,9 +39,9 @@ class _HomePageState extends State<HomePage> {
   void resetToDefault() {
     setState(() {
       amt = 0.0;
-      upiID = "9839916407@paytm";
+      upiID = "";
       message = 'Not actual. Just an example.';
-      nm = "Mudit Garg";
+      nm = "";
     });
   }
 
@@ -105,11 +108,14 @@ class _HomePageState extends State<HomePage> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     mainAxisAlignment: MainAxisAlignment.center,
-                    children: <Widget>[
-                      Image.memory(
-                        app.icon,
-                        height: 60,
-                        width: 60,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(30),
+                        child: Image.memory(
+                          app.icon,
+                          height: 60,
+                          width: 60,
+                        ),
                       ),
                       Text(app.name),
                     ],
@@ -132,7 +138,7 @@ class _HomePageState extends State<HomePage> {
       case UpiIndiaNullResponseException:
         return 'Requested app didn\'t return any response';
       case UpiIndiaInvalidParametersException:
-        return 'Requested app cannot handle the transaction';
+        return 'Invalid Transaction parameters';
       default:
         return 'An Unknown error has occurred';
     }
@@ -171,118 +177,193 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  String getUpiID(String link) {
+    String result = "";
+    String cutStart = link.substring(13);
+    for (var i = 0; i < cutStart.length; i++) {
+      if (cutStart[i] == '&') {
+        break;
+      } else {
+        result += cutStart[i];
+      }
+    }
+    return result;
+  }
+
+  late String scanResult;
+
+  Widget options() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        IconButton(
+          iconSize: 32,
+          color: Colors.green,
+          onPressed: () {
+            showDialog(
+              context: context,
+              builder: (BuildContext context) {
+                return AlertDialog(
+                  title: Text(upiID),
+                  content:
+                      Text("Confirm to send Rs.$amt to the above address ?"),
+                  actions: [
+                    IconButton(
+                      onPressed: () {
+                        upiIDController.clear();
+                        Navigator.pop(context);
+                      },
+                      icon: const Icon(Icons.clear),
+                    ),
+                    IconButton(
+                      onPressed: () {
+                        setState(() {
+                          amt = double.parse(amtController.text);
+                          message = messageController.text;
+                          upiID = upiIDController.text;
+                          nm = nmController.text;
+                        });
+                        Navigator.pop(context);
+                      },
+                      icon: const Icon(Icons.check),
+                    )
+                  ],
+                );
+              },
+            );
+          },
+          icon: const Icon(Icons.check),
+        ),
+        IconButton(
+          onPressed: () async {
+            scanResult = await FlutterBarcodeScanner.scanBarcode(
+                "#ff6666", "Exit", true, ScanMode.QR);
+            String upiAddress;
+            if (scanResult.substring(0, 3) != "upi") {
+              upiAddress = "Invalid UPI QR Code, try again !";
+            } else {
+              upiAddress = getUpiID(scanResult);
+            }
+            upiID = upiAddress;
+            upiIDController.text = upiAddress;
+            setState(() {});
+            // print(scanResult);
+          },
+          icon: const Icon(
+            Icons.qr_code,
+          ),
+          tooltip: "Scan to get UPI ID",
+        ),
+        IconButton(
+          iconSize: 32,
+          color: Colors.red,
+          onPressed: () {
+            setState(() {
+              amtController.clear();
+              messageController.clear();
+              upiIDController.clear();
+              nmController.clear();
+            });
+            resetToDefault();
+          },
+          icon: const Icon(Icons.delete),
+        ),
+      ],
+    );
+  }
+
+  Widget textField({
+    required TextEditingController ctrl,
+    required int fieldNum,
+    required String label,
+    required String hint,
+    required Icon descIcon,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.all(15),
+      child: TextField(
+        controller: ctrl,
+        onChanged: (value) {
+          setState(() {
+            // if (fieldNum == 1) {
+            //   nm = value;
+            // } else
+            if (fieldNum == 2) {
+              upiID = value;
+            } else if (fieldNum == 3) {
+              message = value;
+            } else if (fieldNum == 4) {
+              amt = double.parse(value);
+            }
+          });
+        },
+        decoration: InputDecoration(
+          border: const OutlineInputBorder(),
+          labelText: label,
+          hintText: hint,
+          prefixIcon: descIcon,
+          suffixIconColor: Colors.red,
+          suffixIcon: IconButton(
+            icon: const Icon(Icons.clear),
+            onPressed: () {
+              ctrl.clear();
+              if (fieldNum == 2) {
+                upiID = "";
+              } else if (fieldNum == 3) {
+                message = "";
+              } else if (fieldNum == 4) {
+                amt = 0.0;
+              }
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('CENTRAL UPI App'),
+        title: const Text('Universal UPI'),
       ),
       body: Column(
-        children: <Widget>[
-          Padding(
-            padding: EdgeInsets.all(15),
-            child: TextField(
-              controller: nmController,
-              onChanged: (name) {
-                setState(() {
-                  nm = name;
-                });
-              },
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                labelText: 'Reciever Name',
-                hintText: 'Enter Your Name',
-              ),
-            ),
+        children: [
+          // textField(
+          //   ctrl: nmController,
+          //   fieldNum: 1,
+          //   label: 'Recepient',
+          //   hint: 'Reciever\'s name',
+          // ),
+          textField(
+            ctrl: upiIDController,
+            fieldNum: 2,
+            label: 'Reciever UPI ID',
+            hint: 'address@upi_app',
+            descIcon: const Icon(Icons.browser_updated),
           ),
-          Padding(
-            padding: EdgeInsets.all(15),
-            child: TextField(
-              controller: upiIDController,
-              onChanged: (id) {
-                setState(() {
-                  upiID = id;
-                });
-              },
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                labelText: 'Reciever ID',
-                hintText: 'Enter the UPI ID',
-              ),
-            ),
+          textField(
+            ctrl: messageController,
+            fieldNum: 3,
+            label: 'Message',
+            hint: 'Enter the message',
+            descIcon: const Icon(Icons.abc),
           ),
-          Padding(
-            padding: EdgeInsets.all(15),
-            child: TextField(
-              controller: messageController,
-              onChanged: (msg) {
-                setState(() {
-                  message = msg;
-                });
-              },
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                labelText: 'Transaction Message',
-                hintText: 'Enter the transaction message',
-              ),
-            ),
+          textField(
+            ctrl: amtController,
+            fieldNum: 4,
+            label: 'Amount',
+            hint: 'Enter the amount',
+            descIcon: const Icon(Icons.numbers),
           ),
-          Padding(
-            padding: EdgeInsets.all(15),
-            child: TextField(
-              controller: amtController,
-              keyboardType: TextInputType.number,
-              onChanged: (amount) {
-                var finalAmt = double.parse(amount);
-                setState(() {
-                  amt = finalAmt;
-                });
-              },
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                labelText: 'Amount',
-                hintText: 'Enter the amount',
-              ),
-            ),
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              IconButton(
-                onPressed: () {
-                  setState(() {
-                    amt = double.parse(amtController.text);
-                    message = messageController.text;
-                    upiID = upiIDController.text;
-                    nm = nmController.text;
-                  });
-                },
-                icon: const Icon(Icons.check),
-              ),
-              IconButton(
-                onPressed: () {
-                  setState(() {
-                    amtController.clear();
-                    messageController.clear();
-                    upiIDController.clear();
-                    nmController.clear();
-                  });
-                  resetToDefault();
-                },
-                icon: const Icon(Icons.delete),
-              ),
-            ],
-          ),
+          options(),
           SizedBox(
             height: MediaQuery.of(context).size.height / 10,
             width: MediaQuery.of(context).size.width,
-            child: const Center(
+            child: Center(
               child: Text(
-                "YOUR UPI APPS",
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
+                "Choose from your available UPI Apps",
+                style: header,
               ),
             ),
           ),
